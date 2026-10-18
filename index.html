@@ -176,7 +176,7 @@ nav.tabs button[aria-current=page] svg{stroke:var(--accent)}
       <button class="iconbtn" id="nextDay" aria-label="Día siguiente"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
     </div>
     <button class="today-chip" id="goToday" hidden>Hoy</button>
-    <button class="iconbtn" id="openSettings" aria-label="Metas"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></button>
+    <button class="iconbtn" id="openSettings" aria-label="Metas y copia de seguridad"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></button>
   </header>
   <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
   <main id="main"></main>
@@ -372,13 +372,13 @@ function viewHoy() {
   const nSets = d.ex.reduce((a,e)=>a+e.sets.filter(setLogged).length,0);
   return `
   <section class="card">
-    <h2>Macros <button class="linkbtn" data-go="comida">Añadir comida</button></h2>
+    <h2>Macros <span style="display:flex;gap:14px"><button class="linkbtn" data-goals>Cambiar metas</button><button class="linkbtn" data-go="comida">Añadir comida</button></span></h2>
     <div class="big num">${fmt(tt.kcal)} <small>/ ${fmt(goalKcal())} kcal</small></div>
     <div class="sub">${left >= 0 ? `Te quedan ${fmt(left)} kcal` : `${fmt(-left)} kcal por encima de la meta`}</div>
     ${macroBars(tt)}
   </section>
   <section class="card">
-    <h2>Pasos</h2>
+    <h2>Pasos <button class="linkbtn" data-goals>Cambiar meta</button></h2>
     <div class="steps-row">
       <div><div class="big num" id="stepsBig">${fmt(d.steps)}</div><div class="sub">Meta: ${fmt(g.steps)}</div></div>
       <div class="field" style="width:140px"><label for="stepsIn">Total del día</label><input id="stepsIn" type="number" inputmode="numeric" min="0" value="${d.steps||""}" placeholder="0"></div>
@@ -494,7 +494,7 @@ function viewComida() {
   const mealSel = `<div class="field"><label for="mealSel">Comida del día</label><select id="mealSel">${MEALS.map(m=>`<option ${m===defMeal?"selected":""}>${m}</option>`).join("")}</select></div>`;
   return `
   <section class="card">
-    <h2>Total del día</h2>
+    <h2>Total del día <button class="linkbtn" data-goals>Cambiar metas</button></h2>
     <div class="big num">${fmt(tt.kcal)} <small>/ ${fmt(goalKcal())} kcal</small></div>
     ${macroBars(tt)}
   </section>
@@ -748,7 +748,8 @@ function openSettings() {
       <div class="field"><label for="gC">Carbos (g)</label><input id="gC" type="number" inputmode="numeric" min="0" value="${g.c}"></div>
       <div class="field"><label for="gF">Grasa (g)</label><input id="gF" type="number" inputmode="numeric" min="0" value="${g.f}"></div>
     </div>
-    <div class="sub num" id="gK">= ${fmt(goalKcal())} kcal</div>
+    <div class="field"><label for="gK">Calorías (kcal)</label><input id="gK" type="number" inputmode="numeric" min="0" step="10" value="${Math.round(goalKcal())}"></div>
+    <div class="sub" id="gKhint">Si cambias las calorías, ajusto los carbos para que cuadre. Si cambias un macro, se recalculan las calorías.</div>
     <div class="field"><label for="gS">Pasos</label><input id="gS" type="number" inputmode="numeric" min="0" step="500" value="${g.steps}"></div>
     <div class="row" style="justify-content:flex-end"><button type="button" class="btn ghost" id="closeSheet">Cancelar</button><button class="btn primary" type="submit">Guardar metas</button></div>
     <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:10px">
@@ -772,8 +773,16 @@ function openSettings() {
     settings = {...DEFAULT_SETTINGS, ...o.settings}; days.clear(); for (const d of o.days) days.set(d.date, d);
     saveLocal(); closeSheet(); render(); toast("Datos restaurados");
   };
-  const upd = () => $("#gK").textContent = `= ${fmt(kcalOf(+$("#gP").value||0, +$("#gC").value||0, +$("#gF").value||0))} kcal`;
+  const hint = $("#gKhint"), hintTxt = hint.textContent;
+  const upd = () => { $("#gK").value = Math.round(kcalOf(+$("#gP").value||0, +$("#gC").value||0, +$("#gF").value||0)); hint.textContent = hintTxt; hint.style.color = ""; };
   ["#gP","#gC","#gF"].forEach(s => $(s).addEventListener("input", upd));
+  $("#gK").addEventListener("input", () => {
+    const k = +$("#gK").value || 0, p = +$("#gP").value || 0, f = +$("#gF").value || 0;
+    const c = (k - p*4 - f*9) / 4;
+    $("#gC").value = Math.max(0, Math.round(c));
+    if (c < 0) { hint.textContent = `Con ${fmt(p)} g de proteína y ${fmt(f)} g de grasa ya sumas ${fmt(p*4+f*9)} kcal. Baja la grasa o la proteína para llegar a ${fmt(k)} kcal.`; hint.style.color = "var(--danger)"; }
+    else { hint.textContent = `Carbos ajustados a ${fmt(Math.round(c))} g para llegar a ${fmt(k)} kcal.`; hint.style.color = ""; }
+  });
   $("#sheetBg").addEventListener("click", e => { if (e.target.id === "sheetBg" || e.target.id === "closeSheet") closeSheet(); });
   $("#settingsForm").addEventListener("submit", e => {
     e.preventDefault();
@@ -803,6 +812,7 @@ main.addEventListener("click", e => {
   if (ds.go) { tab = ds.go; render(); window.scrollTo(0,0); return; }
   if (ds.addsteps) { d.steps = (+d.steps||0) + +ds.addsteps; saveDay(); render(); return; }
   if (ds.openroutine !== undefined) { openRoutine(); return; }
+  if (ds.goals !== undefined) { openSettings(); return; }
   if (ds.openexlist !== undefined) { openExList(); return; }
   if (ds.pick) {
     ghostPick[cur] = ds.pick;
