@@ -776,17 +776,26 @@ let bgPref = {type:"default"};
 try { bgPref = JSON.parse(localStorage.getItem("lh_bg")) || bgPref; } catch {}
 function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [n>>16 & 255, n>>8 & 255, n & 255]; }
 function lumOf([r,g,b]) { const f = v => { v /= 255; return v <= .03928 ? v/12.92 : Math.pow((v+.055)/1.055, 2.4); }; return .2126*f(r) + .7152*f(g) + .0722*f(b); }
+const PALETTES = {
+  light: {"--surface":"#ffffff","--surface-2":"#f5f6f8","--line":"#d9dde3","--fg":"#1c2128","--muted":"#4f5866","--ink":"#1c2128","--on-ink":"#ffffff","--accent":"#2b4fd8","--accent-soft":"#e3e9fd","--prot":"#d33a2f","--carb":"#c79600","--fat":"#2b64c8","--step":"#2d8a4e","--danger":"#c0352b","--surface-rgb":"255,255,255","--tshadow":"0 1px 2px rgba(255,255,255,.85),0 0 8px rgba(255,255,255,.5)"},
+  dark:  {"--surface":"#1b1f25","--surface-2":"#22272e","--line":"#3a414b","--fg":"#eef1f4","--muted":"#b3bac5","--ink":"#e8ebef","--on-ink":"#121519","--accent":"#8ca3ff","--accent-soft":"#252d4a","--prot":"#f0645a","--carb":"#f2c230","--fat":"#5b8ef0","--step":"#4fbf75","--danger":"#f0645a","--surface-rgb":"20,23,28","--tshadow":"0 1px 3px rgba(0,0,0,.85),0 0 8px rgba(0,0,0,.5)"}
+};
+const PAL_KEYS = Object.keys(PALETTES.light);
 function applyBg() {
   const root = document.documentElement, st = root.style;
   let layer = document.getElementById("bgLayer");
   if (!layer) { layer = document.createElement("div"); layer.id = "bgLayer"; document.body.prepend(layer); }
   ["--bg","--bg-glass","--page-fg","--page-muted","--card-a","--card-blur","--page-shadow"].forEach(v => st.removeProperty(v));
-  root.classList.remove("has-img","has-bg"); layer.style.backgroundImage = "";
+  root.classList.remove("has-img","has-bg");
+  PAL_KEYS.forEach(v => st.removeProperty(v)); st.removeProperty("color-scheme"); layer.style.backgroundImage = "";
   if (bgPref.type === "default") return;
   const rgb = bgPref.rgb || hexToRgb(bgPref.color || "#1c2128");
   const dark = lumOf(rgb) < .35;
   st.setProperty("--bg", `rgb(${rgb.join(",")})`);
   st.setProperty("--bg-glass", `rgba(${rgb.join(",")},.75)`);
+  const pal = dark ? PALETTES.dark : PALETTES.light;
+  for (const k of PAL_KEYS) st.setProperty(k, pal[k]);
+  st.setProperty("color-scheme", dark ? "dark" : "light");
   st.setProperty("--page-shadow", dark ? "0 1px 3px rgba(0,0,0,.8)" : "0 1px 2px rgba(255,255,255,.8)");
   st.setProperty("--page-fg", dark ? "#f2f4f7" : "#1c2128");
   st.setProperty("--page-muted", dark ? "#c9ced6" : "#4a525d");
