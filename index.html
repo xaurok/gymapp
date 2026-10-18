@@ -187,6 +187,24 @@ html.has-img .datenav h1,html.has-img .status{text-shadow:var(--page-shadow)}
 .vh{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);border:0;opacity:0}
 label.btn{display:inline-flex;align-items:center;cursor:pointer}
 input[type=color]{width:44px;height:36px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);cursor:pointer}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.cal .wd{font-size:11px;text-align:center;color:var(--muted);font-weight:700;letter-spacing:.06em}
+.cd{aspect-ratio:1;max-width:100%;border:1.5px solid transparent;border-radius:9px;background:var(--surface-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;padding:0;color:var(--fg)}
+.cd .dn{font-family:var(--display);font-weight:600;font-size:17px;line-height:1}
+.cd.w{background:var(--ink);color:var(--on-ink)}
+.cd.today{border-color:var(--accent)}
+.cd.sel{box-shadow:0 0 0 2px var(--accent)}
+.cd:disabled{opacity:.35;cursor:default}
+.mk{display:flex;gap:3px;height:6px}
+.mk i{width:6px;height:6px;border-radius:50%;display:block}
+.mk .ms{background:var(--step)}.mk .mkc{background:var(--carb)}
+.cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cal-head h3{text-transform:capitalize}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend .sq{width:12px;height:12px;border-radius:3px;background:var(--ink)}
+.legend .dt{width:8px;height:8px;border-radius:50%}
+#dateTitle{cursor:pointer}
 @media (max-width:380px){.bar-row{grid-template-columns:64px 1fr auto}.big{font-size:38px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -199,6 +217,7 @@ input[type=color]{width:44px;height:36px;padding:2px;border:1px solid var(--line
       <button class="iconbtn" id="nextDay" aria-label="Día siguiente"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
     </div>
     <button class="today-chip" id="goToday" hidden>Hoy</button>
+    <button class="iconbtn" id="openCal" aria-label="Calendario"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M7.5 13h2M11 13h2M14.5 13h2M7.5 16.5h2M11 16.5h2"/></svg></button>
     <button class="iconbtn" id="openSettings" aria-label="Metas y copia de seguridad"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg></button>
   </header>
   <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Conectando…</span></div>
@@ -859,6 +878,52 @@ function wireBg() {
   $("#bgAlpha").addEventListener("input", e => { const a = +e.target.value; $("#bgAlphaV").textContent = Math.round(a*100) + "%"; saveBg({...bgPref, alpha:a}); });
 }
 
+/* ---------- calendario ---------- */
+let calMonth = null;
+function openCalendar() { calMonth = cur.slice(0,7); renderCalendar(); }
+function renderCalendar() {
+  const [y, m] = calMonth.split("-").map(Number);
+  const daysIn = new Date(y, m, 0).getDate(), lead = (new Date(y, m-1, 1).getDay() + 6) % 7;
+  const t = todayKey(), g = settings.goals, gk = goalKcal();
+  let cells = ["L","M","X","J","V","S","D"].map(d => `<span class="wd">${d}</span>`).join("") + "<span></span>".repeat(lead);
+  let nW = 0, nS = 0, nK = 0;
+  for (let d = 1; d <= daysIn; d++) {
+    const k = `${y}-${pad(m)}-${pad(d)}`, dd = days.get(k);
+    const w = isLogged(dd), st = !!(dd && g.steps && dd.steps >= g.steps);
+    const tk = dd && (dd.meals||[]).length ? totals(dd).kcal : null;
+    const kOk = tk != null && gk > 0 && Math.abs(tk - gk) <= gk * 0.1;
+    nW += w; nS += st; nK += kOk;
+    const rn = w && dd.rday ? (routine().find(r => r.id === dd.rday)?.name || "") : "";
+    cells += `<button type="button" class="cd ${w?"w":""} ${k===t?"today":""} ${k===cur?"sel":""}" data-calday="${k}" ${k>t?"disabled":""} aria-label="${d}${w?", entreno"+(rn?" "+esc(rn):""):""}${st?", meta de pasos":""}${kOk?", calorías en meta":""}"><span class="dn">${d}</span><span class="mk">${st?'<i class="ms"></i>':""}${kOk?'<i class="mkc"></i>':""}</span></button>`;
+  }
+  const label = new Date(y, m-1, 1).toLocaleDateString("es-ES", {month:"long", year:"numeric"});
+  $("#sheetRoot").innerHTML = `<div class="sheet-bg" id="cBg"><div class="sheet" role="dialog" aria-label="Calendario">
+    <div class="cal-head">
+      <button class="iconbtn" type="button" data-calnav="-1" aria-label="Mes anterior"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <h3>${label}</h3>
+      <button class="iconbtn" type="button" data-calnav="1" aria-label="Mes siguiente" ${calMonth >= t.slice(0,7) ? "disabled" : ""}><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+    </div>
+    <div class="cal num">${cells}</div>
+    <div class="legend"><span><i class="sq"></i>Entreno</span><span><i class="dt" style="background:var(--step)"></i>Meta de pasos</span><span><i class="dt" style="background:var(--carb)"></i>Calorías en meta (±10 %)</span></div>
+    <div class="stats">
+      <div class="stat"><div class="v num">${nW}</div><div class="l">entrenos</div></div>
+      <div class="stat"><div class="v num">${nS}</div><div class="l">días meta de pasos</div></div>
+      <div class="stat"><div class="v num">${nK}</div><div class="l">días en calorías</div></div>
+    </div>
+    <div class="row" style="justify-content:space-between"><button class="btn ghost" type="button" data-calday="${t}">Ir a hoy</button><button class="btn" type="button" data-calclose>Cerrar</button></div>
+  </div></div>`;
+}
+sheetRoot.addEventListener("click", e => {
+  if (!calMonth || !document.getElementById("cBg")) return;
+  const b = e.target.closest("button");
+  if (e.target.id === "cBg" || b?.dataset.calclose !== undefined) { calMonth = null; closeSheet(); return; }
+  if (b?.dataset.calnav) {
+    const [y, m] = calMonth.split("-").map(Number), d = new Date(y, m-1 + +b.dataset.calnav, 1);
+    calMonth = `${d.getFullYear()}-${pad(d.getMonth()+1)}`; renderCalendar(); return;
+  }
+  if (b?.dataset.calday) { cur = b.dataset.calday; calMonth = null; confirmDel = null; closeSheet(); render(); window.scrollTo(0,0); }
+});
+
 /* ---------- metas ---------- */
 function openSettings() {
   const g = settings.goals;
@@ -926,6 +991,8 @@ $("#prevDay").onclick = () => { cur = addDays(cur,-1); confirmDel = null; render
 $("#nextDay").onclick = () => { if (cur < todayKey()) { cur = addDays(cur,1); confirmDel = null; render(); } };
 $("#goToday").onclick = () => { cur = todayKey(); render(); };
 $("#openSettings").onclick = openSettings;
+$("#openCal").onclick = openCalendar;
+$("#dateTitle").onclick = openCalendar;
 document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => { tab = b.dataset.tab; confirmDel = null; try{localStorage.setItem("lh_tab",tab)}catch{} render(); window.scrollTo(0,0); });
 
 const main = $("#main");
