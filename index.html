@@ -158,7 +158,11 @@ nav.tabs button[aria-current=page] svg{stroke:var(--accent)}
 .rlist .ri.next .t{font-weight:700}
 .sheet .rday{background:var(--surface-2);padding:12px;display:flex;flex-direction:column;gap:8px}
 .sheet .rday input[type=text]{background:var(--surface)}
-.rex-row{display:grid;grid-template-columns:1fr auto 30px;gap:8px;align-items:center;padding:4px 0;border-top:1px solid var(--line)}
+.mv{display:flex;flex-direction:column;gap:2px}
+.mv button{width:28px;height:20px;border-radius:5px;border:1px solid var(--line);background:var(--surface);cursor:pointer;display:grid;place-items:center;padding:0;color:var(--fg)}
+.mv button:disabled{opacity:.3;cursor:default}
+.mv svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.rex-row{display:grid;grid-template-columns:28px 1fr auto 30px;gap:8px;align-items:center;padding:4px 0;border-top:1px solid var(--line)}
 .rex-row .t{font-weight:600;min-width:0;overflow-wrap:anywhere}
 .stepper{display:flex;align-items:center;gap:2px;font-size:13px;color:var(--muted)}
 .stepper button{width:30px;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:16px;line-height:1}
@@ -653,7 +657,9 @@ function renderRoutine(focusId) {
         <button class="iconbtn" type="button" data-rmove="${i}:-1" aria-label="Subir día" ${i ? "" : "disabled"}><svg viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg></button>
         <button class="iconbtn" type="button" data-rmove="${i}:1" aria-label="Bajar día" ${i < draft.days.length-1 ? "" : "disabled"}><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
       </div>
-      <div>${r.ex.map((e,j)=>`<div class="rex-row"><span class="t">${esc(e.name)}</span>
+      <div>${r.ex.map((e,j)=>`<div class="rex-row">
+        <div class="mv"><button type="button" data-rexmove="${i}:${j}:-1" aria-label="Subir ${esc(e.name)}" ${j ? "" : "disabled"}><svg viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg></button><button type="button" data-rexmove="${i}:${j}:1" aria-label="Bajar ${esc(e.name)}" ${j < r.ex.length-1 ? "" : "disabled"}><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button></div>
+        <span class="t">${esc(e.name)}</span>
         <div class="stepper"><button type="button" data-rsets="${i}:${j}:-1" aria-label="Menos series">−</button><span class="num">${e.sets}</span><button type="button" data-rsets="${i}:${j}:1" aria-label="Más series">+</button>&nbsp;series</div>
         <button class="x" type="button" data-rexdel="${i}:${j}" aria-label="Quitar ${esc(e.name)}">×</button></div>`).join("") || `<div class="sub">Sin ejercicios todavía.</div>`}</div>
       <form class="row" data-raddex="${i}" autocomplete="off">
@@ -679,6 +685,7 @@ sheetRoot.addEventListener("click", e => {
   if (ds.radd !== undefined) { const r = {id:uid(), name:letter(draft.days.length), ex:[]}; draft.days.push(r); renderRoutine("rn-"+r.id); return; }
   if (ds.rmove) { const [i,dir] = ds.rmove.split(":").map(Number); const j = i+dir; [draft.days[i], draft.days[j]] = [draft.days[j], draft.days[i]]; renderRoutine(); return; }
   if (ds.rsets) { const [i,j,dir] = ds.rsets.split(":").map(Number); const ex = draft.days[i].ex[j]; ex.sets = Math.min(12, Math.max(1, ex.sets + dir)); renderRoutine(); return; }
+  if (ds.rexmove) { const [i,j,dir] = ds.rexmove.split(":").map(Number); const ex = draft.days[i].ex, k = j+dir; if (k >= 0 && k < ex.length) { [ex[j], ex[k]] = [ex[k], ex[j]]; renderRoutine(); } return; }
   if (ds.rexdel) { const [i,j] = ds.rexdel.split(":").map(Number); draft.days[i].ex.splice(j,1); renderRoutine(); return; }
   if (ds.rdel !== undefined) {
     const r = draft.days[+ds.rdel];
