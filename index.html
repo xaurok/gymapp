@@ -19,7 +19,7 @@
 /* Layout: logbook de gimnasio. Cabecera con fecha, contenido en una columna, barra de pestañas fija abajo.
    Colores de macros tomados de los discos olímpicos: rojo 25 kg, amarillo 15 kg, azul 20 kg, verde 10 kg. */
 :root{
-  --bg:#eef0f2; --surface:#ffffff; --surface-2:#f5f6f8; --line:#d9dde3;
+  --bg:#eef0f2; --surface:#ffffff; --surface-rgb:255,255,255; --surface-2:#f5f6f8; --line:#d9dde3;
   --fg:#1c2128; --muted:#5f6875; --ink:#1c2128; --on-ink:#ffffff;
   --accent:#2b4fd8; --accent-soft:#e3e9fd;
   --prot:#d33a2f; --carb:#d9a400; --fat:#2b64c8; --step:#2d8a4e;
@@ -29,13 +29,13 @@
   --r:10px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#121519; --surface:#1b1f25; --surface-2:#22272e; --line:#2f353e;
+  --bg:#121519; --surface:#1b1f25; --surface-rgb:27,31,37; --surface-2:#22272e; --line:#2f353e;
   --fg:#e8ebef; --muted:#97a0ad; --ink:#e8ebef; --on-ink:#121519;
   --accent:#7d97ff; --accent-soft:#252d4a;
   --prot:#f0645a; --carb:#f2c230; --fat:#5b8ef0; --step:#4fbf75; --danger:#f0645a;
   color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#121519; --surface:#1b1f25; --surface-2:#22272e; --line:#2f353e;
+  --bg:#121519; --surface:#1b1f25; --surface-rgb:27,31,37; --surface-2:#22272e; --line:#2f353e;
   --fg:#e8ebef; --muted:#97a0ad; --ink:#e8ebef; --on-ink:#121519;
   --accent:#7d97ff; --accent-soft:#252d4a;
   --prot:#f0645a; --carb:#f2c230; --fat:#5b8ef0; --step:#4fbf75; --danger:#f0645a;
@@ -168,6 +168,20 @@ nav.tabs button[aria-current=page] svg{stroke:var(--accent)}
 .stepper button{width:30px;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:16px;line-height:1}
 .stepper .num{min-width:26px;text-align:center;font-family:var(--display);font-weight:600;font-size:18px;color:var(--fg)}
 .iconbtn:disabled{opacity:.35;cursor:default}
+
+html.has-bg .card,html.has-bg nav.tabs{background:rgba(var(--surface-rgb),var(--card-a,1));-webkit-backdrop-filter:blur(var(--card-blur,0px));backdrop-filter:blur(var(--card-blur,0px))}
+html.has-bg .card{border-color:rgba(var(--surface-rgb),.35)}
+#bgLayer{position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center;pointer-events:none}
+.datenav h1{color:var(--page-fg,var(--fg))}
+.status{color:var(--page-muted,var(--muted))}
+html.has-img header.top,html.has-img body::before{background:var(--bg-glass);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:8px}
+.sw{aspect-ratio:1;max-width:100%;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0}
+.sw[aria-pressed=true]{outline:3px solid var(--accent);outline-offset:2px}
+.sw.def{background:linear-gradient(135deg,#eef0f2 50%,#121519 50%)}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+input[type=color]{width:44px;height:36px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);cursor:pointer}
 @media (max-width:380px){.bar-row{grid-template-columns:64px 1fr auto}.big{font-size:38px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -379,13 +393,13 @@ function viewHoy() {
   const nSets = d.ex.reduce((a,e)=>a+e.sets.filter(setLogged).length,0);
   return `
   <section class="card">
-    <h2>Macros <span style="display:flex;gap:14px"><button class="linkbtn" data-goals>Cambiar metas</button><button class="linkbtn" data-go="comida">Añadir comida</button></span></h2>
+    <h2>Macros <button class="linkbtn" data-go="comida">Añadir comida</button></h2>
     <div class="big num">${fmt(tt.kcal)} <small>/ ${fmt(goalKcal())} kcal</small></div>
     <div class="sub">${left >= 0 ? `Te quedan ${fmt(left)} kcal` : `${fmt(-left)} kcal por encima de la meta`}</div>
     ${macroBars(tt)}
   </section>
   <section class="card">
-    <h2>Pasos <button class="linkbtn" data-goals>Cambiar meta</button></h2>
+    <h2>Pasos</h2>
     <div class="steps-row">
       <div><div class="big num" id="stepsBig">${fmt(d.steps)}</div><div class="sub">Meta: ${fmt(g.steps)}</div></div>
       <div class="field" style="width:140px"><label for="stepsIn">Total del día</label><input id="stepsIn" type="number" inputmode="numeric" min="0" value="${d.steps||""}" placeholder="0"></div>
@@ -501,7 +515,7 @@ function viewComida() {
   const mealSel = `<div class="field"><label for="mealSel">Comida del día</label><select id="mealSel">${MEALS.map(m=>`<option ${m===defMeal?"selected":""}>${m}</option>`).join("")}</select></div>`;
   return `
   <section class="card">
-    <h2>Total del día <button class="linkbtn" data-goals>Cambiar metas</button></h2>
+    <h2>Total del día</h2>
     <div class="big num">${fmt(tt.kcal)} <small>/ ${fmt(goalKcal())} kcal</small></div>
     ${macroBars(tt)}
   </section>
@@ -751,6 +765,83 @@ sheetRoot.addEventListener("submit", e => {
   rememberEx(n); exFilter = ""; $("#exNew").value = ""; $("#exListBox").innerHTML = exListInner(); toast(`${n} añadido`);
 });
 
+/* ---------- fondo personalizado (se guarda en este dispositivo) ---------- */
+const BG_COLORS = ["#1c2128","#22304f","#2b4fd8","#5b2a86","#8f2a22","#b8571f","#1f5a3a","#2f6f73","#e8dcc6","#f3d6dc","#d7e6f5","#dfeccf"];
+let bgPref = {type:"default"};
+try { bgPref = JSON.parse(localStorage.getItem("lh_bg")) || bgPref; } catch {}
+function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [n>>16 & 255, n>>8 & 255, n & 255]; }
+function lumOf([r,g,b]) { const f = v => { v /= 255; return v <= .03928 ? v/12.92 : Math.pow((v+.055)/1.055, 2.4); }; return .2126*f(r) + .7152*f(g) + .0722*f(b); }
+function applyBg() {
+  const root = document.documentElement, st = root.style;
+  let layer = document.getElementById("bgLayer");
+  if (!layer) { layer = document.createElement("div"); layer.id = "bgLayer"; document.body.prepend(layer); }
+  ["--bg","--bg-glass","--page-fg","--page-muted","--card-a","--card-blur"].forEach(v => st.removeProperty(v));
+  root.classList.remove("has-img","has-bg"); layer.style.backgroundImage = "";
+  if (bgPref.type === "default") return;
+  const rgb = bgPref.rgb || hexToRgb(bgPref.color || "#1c2128");
+  const dark = lumOf(rgb) < .35;
+  st.setProperty("--bg", `rgb(${rgb.join(",")})`);
+  st.setProperty("--bg-glass", `rgba(${rgb.join(",")},.72)`);
+  st.setProperty("--page-fg", dark ? "#f2f4f7" : "#1c2128");
+  st.setProperty("--page-muted", dark ? "#c9ced6" : "#4a525d");
+  root.classList.add("has-bg");
+  const a = bgPref.alpha ?? .6;
+  st.setProperty("--card-a", a);
+  st.setProperty("--card-blur", a < 1 ? "12px" : "0px");
+  if (bgPref.type === "image" && bgPref.img) { root.classList.add("has-img"); layer.style.backgroundImage = `url("${bgPref.img}")`; }
+}
+function saveBg(p) {
+  const prev = bgPref; bgPref = p;
+  try { localStorage.setItem("lh_bg", JSON.stringify(p)); }
+  catch { bgPref = prev; toast("La imagen es demasiado grande para guardarla. Prueba con otra."); return false; }
+  applyBg(); return true;
+}
+function loadBgImage(file) {
+  if (!file || !/^image\//.test(file.type)) { toast("Elige una imagen"); return; }
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => {
+    const max = 1280, sc = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement("canvas"); c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
+    const x = c.getContext("2d"); x.drawImage(img, 0, 0, c.width, c.height);
+    const t = document.createElement("canvas"); t.width = t.height = 1; const tx = t.getContext("2d"); tx.drawImage(c, 0, 0, 1, 1);
+    const rgb = [...tx.getImageData(0,0,1,1).data.slice(0,3)];
+    URL.revokeObjectURL(url);
+    if (saveBg({type:"image", img: c.toDataURL("image/jpeg", .72), rgb, alpha:bgPref.alpha})) { toast("Fondo actualizado"); markSwatches(); }
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); toast("No se pudo abrir esa imagen"); };
+  img.src = url;
+}
+function bgSectionHtml() {
+  return `<div style="border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:10px">
+      <h3 style="font-size:20px">Fondo</h3>
+      <div class="swatches" role="group" aria-label="Color de fondo">
+        <button type="button" class="sw def" data-bgc="default" aria-label="Fondo por defecto"></button>
+        ${BG_COLORS.map(c => `<button type="button" class="sw" data-bgc="${c}" style="background:${c}" aria-label="Color ${c}"></button>`).join("")}
+      </div>
+      <div class="row" style="align-items:center">
+        <label class="sub" for="bgCustom" style="display:flex;align-items:center;gap:8px">Color propio <input type="color" id="bgCustom" value="${bgPref.type==="color" ? bgPref.color : "#2b4fd8"}"></label>
+        <span class="btn sm filebtn">Imagen propia<input type="file" id="bgFile" accept="image/*" aria-label="Elegir imagen de fondo"></span>
+      </div>
+      <div class="field"><label for="bgAlpha">Opacidad de los cuadros: <span id="bgAlphaV">${Math.round((bgPref.alpha ?? .6)*100)}%</span></label>
+        <input type="range" id="bgAlpha" min="0.2" max="1" step="0.05" value="${bgPref.alpha ?? .6}" ${bgPref.type==="default"?"disabled":""}></div>
+      <div class="sub">Baja la opacidad para ver más el fondo. Funciona con colores e imágenes propias. El fondo se guarda en este dispositivo.</div>
+    </div>`;
+}
+function markSwatches() {
+  const r = document.getElementById("bgAlpha"); if (r) r.disabled = bgPref.type === "default";
+  document.querySelectorAll(".sw").forEach(b => b.setAttribute("aria-pressed", String(
+    (bgPref.type === "default" && b.dataset.bgc === "default") || (bgPref.type === "color" && b.dataset.bgc === bgPref.color))));
+}
+function wireBg() {
+  markSwatches();
+  document.querySelectorAll(".sw").forEach(b => b.onclick = () => {
+    saveBg(b.dataset.bgc === "default" ? {type:"default", alpha:bgPref.alpha} : {type:"color", color:b.dataset.bgc, alpha:bgPref.alpha}); markSwatches();
+  });
+  $("#bgCustom").addEventListener("input", e => { saveBg({type:"color", color:e.target.value, alpha:bgPref.alpha}); markSwatches(); });
+  $("#bgFile").addEventListener("change", e => loadBgImage(e.target.files[0]));
+  $("#bgAlpha").addEventListener("input", e => { const a = +e.target.value; $("#bgAlphaV").textContent = Math.round(a*100) + "%"; saveBg({...bgPref, alpha:a}); });
+}
+
 /* ---------- metas ---------- */
 function openSettings() {
   const g = settings.goals;
@@ -765,6 +856,7 @@ function openSettings() {
     <div class="sub" id="gKhint">Si cambias las calorías, ajusto los carbos para que cuadre. Si cambias un macro, se recalculan las calorías.</div>
     <div class="field"><label for="gS">Pasos</label><input id="gS" type="number" inputmode="numeric" min="0" step="500" value="${g.steps}"></div>
     <div class="row" style="justify-content:flex-end"><button type="button" class="btn ghost" id="closeSheet">Cancelar</button><button class="btn primary" type="submit">Guardar metas</button></div>
+    ${bgSectionHtml()}
     <div style="border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:10px">
       <h3 style="font-size:20px">Copia de seguridad</h3>
       <div class="sub">Tus datos viven solo en este móvil y se borran si desinstalas la app. Copia tus datos de vez en cuando y guárdalos en una nota o envíatelos.</div>
@@ -786,6 +878,7 @@ function openSettings() {
     settings = {...DEFAULT_SETTINGS, ...o.settings}; days.clear(); for (const d of o.days) days.set(d.date, d);
     saveLocal(); closeSheet(); render(); toast("Datos restaurados");
   };
+  wireBg();
   const hint = $("#gKhint"), hintTxt = hint.textContent;
   const upd = () => { $("#gK").value = Math.round(kcalOf(+$("#gP").value||0, +$("#gC").value||0, +$("#gF").value||0)); hint.textContent = hintTxt; hint.style.color = ""; };
   ["#gP","#gC","#gF"].forEach(s => $(s).addEventListener("input", upd));
@@ -933,6 +1026,7 @@ main.addEventListener("submit", e => {
 let lastToday = todayKey();
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { const t = todayKey(); if (t !== lastToday) { if (cur === lastToday) cur = t; lastToday = t; render(); } } });
 
+applyBg();
 render();
 connect();
 try { navigator.storage?.persist?.(); } catch {}
