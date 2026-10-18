@@ -264,9 +264,12 @@ const currentRday = (k = cur) => { const d = day(k); return d.rday ? routine().f
 function totals(d) {
   const t = {p:0,c:0,f:0};
   for (const m of d.meals) { t.p += +m.p||0; t.c += +m.c||0; t.f += +m.f||0; }
-  t.kcal = kcalOf(t.p,t.c,t.f);
+  t.kcal = d.meals.reduce((a,m)=>a+mealKcal(m),0);
   return t;
 }
+const hasK = v => v !== undefined && v !== null && v !== "";
+const mealKcal = m => hasK(m.kcal) ? +m.kcal : kcalOf(+m.p||0, +m.c||0, +m.f||0);
+const foodKcal = f => hasK(f.kcal) ? +f.kcal : kcalOf(+f.p||0, +f.c||0, +f.f||0);
 const goalKcal = () => kcalOf(settings.goals.p, settings.goals.c, settings.goals.f);
 
 /* ---------- almacenamiento ---------- */
@@ -501,11 +504,11 @@ function viewComida() {
   <section class="card">
     <h2>Registro</h2>
     ${groups.length ? groups.map(g => {
-      const s = g.items.reduce((a,x)=>a+kcalOf(+x.p||0,+x.c||0,+x.f||0),0);
+      const s = g.items.reduce((a,x)=>a+mealKcal(x),0);
       return `<div class="mealhd"><span>${g.m}</span><span class="num">${fmt(s)} kcal</span></div><div class="list">${g.items.map(x=>`
         <div class="item"><div style="min-width:0"><div class="t">${esc(x.name)}${x.grams?` <span class="m num">${fmt(x.grams)} g</span>`:""}</div>
           <div class="m num macro-inline"><span>P ${fmt(x.p,1)}</span><span>C ${fmt(x.c,1)}</span><span>G ${fmt(x.f,1)}</span></div></div>
-          <div class="k num">${fmt(kcalOf(+x.p||0,+x.c||0,+x.f||0))}</div>
+          <div class="k num">${fmt(mealKcal(x))}</div>
           <button class="x" aria-label="Borrar ${esc(x.name)}" data-delmeal="${x.i}">×</button></div>`).join("")}</div>`;
     }).join("") : `<div class="sub">Nada registrado este día.</div>`}
   </section>
@@ -530,6 +533,8 @@ function viewComida() {
           <div class="field"><label for="mC">Carbos (g)</label><input id="mC" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0"></div>
           <div class="field"><label for="mF">Grasa (g)</label><input id="mF" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0"></div>
         </div>
+        <div class="field"><label for="mK">Calorías (kcal)</label><input id="mK" type="number" inputmode="numeric" min="0" step="1" placeholder="Se calculan con los macros"></div>
+        <div class="sub" style="margin-top:-4px">Si lo dejas vacío se calculan con los macros. Puedes poner solo las calorías si no sabes los macros.</div>
         ${mealSel}
         <button class="btn primary" type="submit">Añadir</button>
       </form>`}
@@ -539,7 +544,7 @@ function viewComida() {
     <div class="list">${[...foods].sort((a,b)=>a.name.localeCompare(b.name,"es")).map(f=>`
       <div class="item"><div style="min-width:0"><div class="t">${esc(f.name)}</div>
         <div class="m num macro-inline"><span>P ${fmt(f.p,1)}</span><span>C ${fmt(f.c,1)}</span><span>G ${fmt(f.f,1)}</span></div></div>
-        <div class="k num">${fmt(kcalOf(f.p,f.c,f.f))}</div>
+        <div class="k num">${fmt(foodKcal(f))}</div>
         <button class="x" aria-label="Borrar ${esc(f.name)}" data-delfood="${f.id}">${confirmDel==="food:"+f.id?"✓":"×"}</button></div>`).join("") || `<div class="sub">Lista vacía.</div>`}</div>
     <form id="addFoodForm" autocomplete="off" style="display:flex;flex-direction:column;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
       <div class="field"><label for="fName">Nuevo alimento</label><input id="fName" type="text" placeholder="Ej. Lomo de cerdo" required></div>
@@ -548,6 +553,7 @@ function viewComida() {
         <div class="field"><label for="fC">C / 100 g</label><input id="fC" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0"></div>
         <div class="field"><label for="fF">G / 100 g</label><input id="fF" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0"></div>
       </div>
+      <div class="field"><label for="fK">Kcal / 100 g</label><input id="fK" type="number" inputmode="numeric" min="0" step="1" placeholder="Se calculan con los macros"></div>
       <button class="btn" type="submit">Guardar alimento</button>
     </form>
   </section>`;
@@ -558,7 +564,7 @@ function updateFoodPreview() {
   const f = settings.foods.find(x => x.id === $("#foodSel").value), g = +$("#gramsIn").value || 0;
   if (!f) { el.textContent = ""; return; }
   const k = g/100;
-  el.textContent = `${fmt(kcalOf(f.p,f.c,f.f)*k)} kcal · P ${fmt(f.p*k,1)} · C ${fmt(f.c*k,1)} · G ${fmt(f.f*k,1)}`;
+  el.textContent = `${fmt(foodKcal(f)*k)} kcal · P ${fmt(f.p*k,1)} · C ${fmt(f.c*k,1)} · G ${fmt(f.f*k,1)}`;
 }
 
 /* ---------- gráficas ---------- */
@@ -870,6 +876,8 @@ main.addEventListener("input", e => {
   }
   if (t.dataset.f) { materialize(); d.ex[+t.dataset.ex].sets[+t.dataset.set][t.dataset.f] = t.value === "" ? "" : +t.value; saveDay(); return; }
   if (t.id === "gramsIn") updateFoodPreview();
+  if (["mP","mC","mF"].includes(t.id)) { const k = kcalOf(+$("#mP").value||0, +$("#mC").value||0, +$("#mF").value||0); $("#mK").placeholder = k ? `${fmt(k)} (calculado)` : "Se calculan con los macros"; }
+  if (["fP","fC","fF"].includes(t.id)) { const k = kcalOf(+$("#fP").value||0, +$("#fC").value||0, +$("#fF").value||0); $("#fK").placeholder = k ? `${fmt(k)} (calculado)` : "Se calculan con los macros"; }
 });
 main.addEventListener("change", e => {
   if (e.target.id === "foodSel") updateFoodPreview();
@@ -893,17 +901,23 @@ main.addEventListener("submit", e => {
     const food = settings.foods.find(x => x.id === $("#foodSel").value), g = +$("#gramsIn").value || 0;
     if (!food || !g) { toast("Indica los gramos"); return; }
     const k = g/100;
-    d.meals.push({id:uid(), name:food.name, grams:g, p:r1(food.p*k), c:r1(food.c*k), f:r1(food.f*k), meal:$("#mealSel").value});
+    const m = {id:uid(), name:food.name, grams:g, p:r1(food.p*k), c:r1(food.c*k), f:r1(food.f*k), meal:$("#mealSel").value};
+    if (hasK(food.kcal)) m.kcal = Math.round(food.kcal*k);
+    d.meals.push(m);
     saveDay(); render(); toast(`${food.name} añadido`); return;
   }
   if (f.id === "addManualForm") {
     const name = $("#mName").value.trim(); if (!name) return;
-    d.meals.push({id:uid(), name, p:r1(+$("#mP").value||0), c:r1(+$("#mC").value||0), f:r1(+$("#mF").value||0), meal:$("#mealSel").value});
+    const m = {id:uid(), name, p:r1(+$("#mP").value||0), c:r1(+$("#mC").value||0), f:r1(+$("#mF").value||0), meal:$("#mealSel").value};
+    if ($("#mK").value !== "") m.kcal = Math.round(+$("#mK").value);
+    d.meals.push(m);
     saveDay(); render(); toast(`${name} añadido`); return;
   }
   if (f.id === "addFoodForm") {
     const name = $("#fName").value.trim(); if (!name) return;
-    settings.foods.push({id:uid(), name, p:r1(+$("#fP").value||0), c:r1(+$("#fC").value||0), f:r1(+$("#fF").value||0)});
+    const nf = {id:uid(), name, p:r1(+$("#fP").value||0), c:r1(+$("#fC").value||0), f:r1(+$("#fF").value||0)};
+    if ($("#fK").value !== "") nf.kcal = Math.round(+$("#fK").value);
+    settings.foods.push(nf);
     saveSettings(); render(); toast("Alimento guardado"); return;
   }
 });
