@@ -207,6 +207,11 @@ input[type=color]{width:44px;height:36px;padding:2px;border:1px solid var(--line
 #dateTitle{cursor:pointer}
 .pc-only{display:none}
 @media (hover:hover) and (pointer:fine){.pc-only{display:grid}}
+.note{display:block;width:100%;text-align:left;background:var(--accent-soft);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;cursor:pointer;color:var(--fg)}
+.note-k{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+.note-edit{display:flex;flex-direction:column;gap:8px}
+.note-edit textarea{width:100%;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;font-size:16px;color:var(--fg);resize:vertical}
+html.has-img .card .note{text-shadow:none}
 @media (max-width:380px){.bar-row{grid-template-columns:64px 1fr auto}.big{font-size:38px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -250,6 +255,9 @@ const dateOf = k => { const [y,m,d] = k.split("-").map(Number); return new Date(
 const addDays = (k, n) => { const d = dateOf(k); d.setDate(d.getDate()+n); return keyOf(d); };
 const todayKey = () => keyOf(new Date());
 const shortDate = k => dateOf(k).toLocaleDateString("es-ES", {day:"numeric", month:"short"});
+const noteKey = n => n.trim().toLowerCase();
+const getNote = n => (settings.exNotes || {})[noteKey(n)] || "";
+let noteEdit = null;
 const nowHM = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const MEALS = ["Desayuno","Comida","Merienda","Cena","Otro"];
 const COMMON_EX = ["Press banca","Press inclinado","Sentadilla","Peso muerto","Peso muerto rumano","Press militar","Dominadas","Remo con barra","Jalón al pecho","Hip thrust","Prensa","Zancadas","Curl bíceps","Extensión tríceps","Fondos","Elevaciones laterales","Curl femoral","Extensión de cuádriceps","Gemelos"];
@@ -369,7 +377,7 @@ async function connect() {
   setStatus("", "Cargando tus datos…");
   db.doc("meta/settings").onSnapshot(s => {
     if (dirty.has("meta/settings")) return;
-    if (s.exists) { const d = s.data(); settings = {goals:{...DEFAULT_SETTINGS.goals, ...(d.goals||{})}, foods:[...(d.foods||[])], routine: structuredClone(d.routine || {days:[]}), exList: d.exList ? [...d.exList] : null}; }
+    if (s.exists) { const d = s.data(); settings = {goals:{...DEFAULT_SETTINGS.goals, ...(d.goals||{})}, foods:[...(d.foods||[])], routine: structuredClone(d.routine || {days:[]}), exList: d.exList ? [...d.exList] : null, exNotes: {...(d.exNotes||{})}}; }
     requestRender();
   }, () => setStatus("warn", "Se perdió la conexión. Recarga la página."));
   db.collection("days").orderBy("date","desc").limit(500).onSnapshot(snap => {
@@ -386,7 +394,7 @@ async function connect() {
 
 /* ---------- render ---------- */
 let renderPending = false;
-const editing = () => { const a = document.activeElement; return a && $("#main").contains(a) && /INPUT|SELECT/.test(a.tagName); };
+const editing = () => { const a = document.activeElement; return a && $("#main").contains(a) && /INPUT|SELECT|TEXTAREA/.test(a.tagName); };
 function requestRender() { if (editing()) { renderPending = true; return; } render(); }
 document.addEventListener("focusout", () => setTimeout(() => { if (renderPending && !editing()) { renderPending = false; render(); } }, 50));
 
@@ -483,6 +491,11 @@ function viewEntreno() {
     return `<section class="card ex">
       <div class="ex-head"><div><div class="ex-name">${esc(e.name)}</div><div class="ex-last num">${esc(ltTxt)}</div></div>
         <button class="btn sm ghost ${confirmDel===delKey?"danger":""}" data-delex="${i}">${confirmDel===delKey?"¿Quitar hoy?":"Quitar"}</button></div>
+      ${noteEdit === noteKey(e.name) ? `<div class="note-edit">
+          <textarea id="note-${e.id}" rows="3" placeholder="Ej. Codos a 45°, bajar en 3 segundos, agarre ancho…" aria-label="Nota de ${esc(e.name)}">${esc(getNote(e.name))}</textarea>
+          <div class="row" style="justify-content:flex-end"><button class="btn sm ghost" data-notecancel>Cancelar</button><button class="btn sm primary" data-notesave="${i}">Guardar nota</button></div>
+        </div>`
+        : getNote(e.name) ? `<button class="note" data-noteedit="${i}" aria-label="Editar nota de ${esc(e.name)}"><span class="note-k">Nota</span>${esc(getNote(e.name))}</button>` : ""}
       <div class="sets num">
         <span class="hd" style="text-align:center">#</span><span class="hd">Peso (kg)</span><span class="hd">Reps</span><span></span>
         ${e.sets.map((s,j)=>`<span class="n">${j+1}</span>
@@ -490,7 +503,7 @@ function viewEntreno() {
           <input type="number" inputmode="numeric" min="0" aria-label="Repeticiones serie ${j+1}" id="rp-${e.id}-${j}" data-ex="${i}" data-set="${j}" data-f="reps" value="${s.reps ?? ""}" placeholder="${ph(j,"reps")}">
           <button class="x" aria-label="Borrar serie ${j+1}" data-delset="${i}:${j}">×</button>`).join("")}
       </div>
-      <div class="ex-foot"><button class="btn sm" data-addset="${i}">+ Serie</button>
+      <div class="ex-foot"><span style="display:flex;gap:8px;align-items:center"><button class="btn sm" data-addset="${i}">+ Serie</button>${!getNote(e.name) && noteEdit !== noteKey(e.name) ? `<button class="linkbtn" data-noteedit="${i}">+ Nota</button>` : ""}</span>
         ${lt && !e.sets.some(setLogged) ? `<button class="linkbtn" data-copylast="${i}">Copiar la última vez</button>` : ""}</div>
     </section>`;
   }).join("");
@@ -1051,6 +1064,21 @@ main.addEventListener("click", e => {
   if (ds.go) { tab = ds.go; render(); window.scrollTo(0,0); return; }
   if (ds.addsteps) { d.steps = (+d.steps||0) + +ds.addsteps; saveDay(); render(); return; }
   if (ds.openroutine !== undefined) { openRoutine(); return; }
+  if (ds.noteedit !== undefined || ds.notesave !== undefined) {
+    const g = ghostDay(), list = g ? g.ex : d.ex, ex = list[+(ds.noteedit ?? ds.notesave)];
+    if (!ex) return;
+    const k = noteKey(ex.name);
+    if (ds.notesave !== undefined) {
+      const ta = document.querySelector(".note-edit textarea"), v = (ta?.value || "").trim();
+      settings.exNotes = {...(settings.exNotes || {})};
+      if (v) settings.exNotes[k] = v; else delete settings.exNotes[k];
+      saveSettings(); noteEdit = null; render(); toast(v ? "Nota guardada" : "Nota borrada"); return;
+    }
+    noteEdit = k; render();
+    setTimeout(() => { const ta = document.querySelector(".note-edit textarea"); if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); } }, 0);
+    return;
+  }
+  if (ds.notecancel !== undefined) { noteEdit = null; render(); return; }
   if (ds.goals !== undefined) { openSettings(); return; }
   if (ds.openexlist !== undefined) { openExList(); return; }
   if (ds.pick) {

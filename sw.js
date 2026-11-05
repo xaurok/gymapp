@@ -1,4 +1,5 @@
-const VERSION = "libreta-v11";
+// Sube este número cada vez que cambies index.html para que los móviles descarguen la versión nueva.
+const VERSION = "libreta-v18";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
@@ -11,6 +12,7 @@ self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
+  // Fuentes de Google: se guardan la primera vez para usarlas sin conexión
   if (url.hostname.endsWith("fonts.googleapis.com") || url.hostname.endsWith("fonts.gstatic.com")) {
     e.respondWith(caches.open(VERSION).then(async c => {
       const hit = await c.match(req); if (hit) return hit;
@@ -19,6 +21,7 @@ self.addEventListener("fetch", e => {
     return;
   }
   if (url.origin !== location.origin) return;
+  // App: primero la red (para tener siempre lo último) y, sin conexión, la copia guardada
   e.respondWith(fetch(req).then(res => {
     const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); return res;
   }).catch(() => caches.match(req).then(r => r || caches.match("./index.html"))));
